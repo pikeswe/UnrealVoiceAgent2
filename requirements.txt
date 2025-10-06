@@ -6,4 +6,4 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 numpy>=1.24.0
 PyQt6>=6.6.0
-kani-tts>=0.1.3
+git+https://github.com/nineninesix-ai/kani-tts.git

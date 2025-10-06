@@ -1,5 +1,4 @@
 # Nova – Local Unreal AI Companion
-codex/develop-local-ai-voice-companion-for-unreal-rjlcta
 
 Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
 
@@ -103,7 +102,6 @@ The status panel displays:
 * `Emotion Stream`: `ws://<host>:<port>/ws/emotion` – optional metadata channel.
 
 ## 4. Unreal Engine Integration
-
 
 1. Open **Live Link** in Unreal Engine 5.6 and click **Add Source → Message Bus Source**.
 2. Enter the audio endpoint from the control panel (default `ws://localhost:5000/ws/audio`).
