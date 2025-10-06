@@ -1,6 +1,6 @@
 # Nova – Local Unreal AI Companion
 
-Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 3 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
+Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct AWQ), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
 codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
@@ -22,7 +22,7 @@ The repository is structured so creative developers can launch the control panel
 ## 1. System Requirements
 
 * **OS**: Windows 11 (developed cross-platform, but optimised for Windows)
-* **GPU**: RTX 4080 Super (16 GB) recommended. Quantised models (INT4/GPTQ/AWQ) allow use on 8 GB cards.
+* **GPU**: RTX 4080 Super (16 GB) recommended. Quantised models (INT4/AWQ) allow use on 8 GB cards.
 * **Storage**: ~12 GB for the LLM + 2 GB for Kani-TTS models.
 * **Python**: 3.10 or 3.11 (64-bit). Install from [python.org](https://www.python.org/downloads/).
 
@@ -62,11 +62,11 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
    > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
 
 4. **Download the models**
-   * **LLM (Qwen 3 4B Instruct, GPTQ or FP16)**
+   * **LLM (Qwen 2.5 4B Instruct AWQ)**
      ```powershell
-     python scripts/download_models.py --llm Qwen/Qwen3-4B-Instruct --output models
+     python scripts/download_models.py --llm Qwen/Qwen2.5-4B-Instruct-AWQ --output models
      ```
-     Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (e.g. `models/llm`).
+     Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (default `models/Qwen2.5-4B-Instruct-AWQ`).
 
    * **Kani-TTS** – the synthesiser code is vendored inside this repository; you only need the checkpoint weights. Use the helper script to grab them from Hugging Face:
      ```powershell
@@ -121,7 +121,7 @@ The status panel displays:
 
 ## 5. How It Works
 
-1. **LLM Engine (`LLM/engine.py`)** – loads Qwen locally via `transformers`, instructs it to always answer with `{ "emotion": ..., "text": ... }`, and parses the output.
+1. **LLM Engine (`LLM/engine.py`)** – loads Qwen 2.5 4B Instruct AWQ locally via `transformers`, instructs it to always answer with `{ "emotion": ..., "text": ... }`, and parses the output.
 2. **Emotion Mapper (`Utils/emotions.py`)** – converts the textual emotion into slider weights for MetaHuman.
 3. **Kani-TTS (`TTS/kani_engine.py`)** – streams PCM16 chunks as soon as they are generated.
 4. **Stream Server (`Server/streaming.py`)** – FastAPI WebSocket broadcaster that Unreal connects to.
@@ -133,7 +133,7 @@ All components are modular. Swap the LLM or TTS by editing the respective wrappe
 ## 6. Latency Optimisation
 
 * Enable **CUDA** by installing `torch` with GPU support (`pip install torch --index-url https://download.pytorch.org/whl/cu121`).
-* Use quantised checkpoints (`GPTQ`, `AWQ`, `INT4`) for faster decoding on 8 GB GPUs.
+* Use quantised checkpoints (`AWQ`, `INT4`) for faster decoding on 8 GB GPUs.
 * Lower `max_new_tokens` in `config/default_config.json` for shorter responses.
 * Adjust `tts.chunk_size` to 512 or 768 for earlier playback start (with minor CPU overhead).
 * Run the control panel and Unreal on the same machine to avoid network hops.

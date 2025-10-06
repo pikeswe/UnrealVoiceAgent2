@@ -20,6 +20,7 @@ class LLMConfig:
     """Configuration parameters for :class:`LLMEngine`."""
 
     model_name_or_path: str
+    type: str = "transformers"
     device: str = "cuda"
     max_new_tokens: int = 256
     temperature: float = 0.6
@@ -36,8 +37,8 @@ class LLMConfig:
 class LLMEngine:
     """Wrapper around a Hugging Face causal language model.
 
-    The class is designed to work with models such as Qwen 3 4B and its
-    quantised derivatives. Only open-source, locally hosted models are
+    The class is designed to work with models such as Qwen 2.5 4B Instruct
+    AWQ and its quantised derivatives. Only open-source, locally hosted models are
     supported; no remote endpoints are contacted.
     """
 
@@ -56,11 +57,8 @@ class LLMEngine:
         )
 
         model_kwargs: Dict[str, object] = {}
-        if self.config.quantization:
-            if self.config.quantization.lower() == "gptq":
-                model_kwargs.update({"torch_dtype": torch.float16})
-            elif self.config.quantization.lower() in {"awq", "int4"}:
-                model_kwargs.update({"torch_dtype": torch.float16})
+        if self.config.quantization and self.config.quantization.lower() in {"awq", "int4"}:
+            model_kwargs.update({"torch_dtype": torch.float16})
 
         logger.info("Loading causal LM from %s", self.config.model_name_or_path)
         self._model = AutoModelForCausalLM.from_pretrained(

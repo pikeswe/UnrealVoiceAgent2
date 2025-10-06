@@ -1,13 +1,14 @@
 {
   "llm": {
-    "model_name_or_path": "Qwen/Qwen3-4B-Instruct",
+    "model_name_or_path": "models/Qwen2.5-4B-Instruct-AWQ",
+    "type": "transformers",
     "device": "cuda",
     "max_new_tokens": 256,
     "temperature": 0.6,
     "top_p": 0.9,
     "repetition_penalty": 1.05,
     "system_prompt": "You are Nova, an empathetic companion living inside Unreal Engine. Always respond with a JSON object shaped as {\"emotion\": <emotion>, \"text\": <reply>}.",
-    "quantization": null
+    "quantization": "awq"
   },
   "tts": {
     "model_dir": "models/kani_tts",
