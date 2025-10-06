@@ -1,0 +1,25 @@
+{
+  "llm": {
+    "model_name_or_path": "Qwen/Qwen2.5-4B-Instruct",
+    "device": "cuda",
+    "max_new_tokens": 256,
+    "temperature": 0.6,
+    "top_p": 0.9,
+    "repetition_penalty": 1.05,
+    "system_prompt": "You are Nova, an empathetic companion living inside Unreal Engine. Always respond with a JSON object shaped as {\"emotion\": <emotion>, \"text\": <reply>}.",
+    "quantization": null
+  },
+  "tts": {
+    "model_dir": "models/kani_tts",
+    "voice": "kari",
+    "sample_rate": 24000,
+    "chunk_size": 1024,
+    "temperature": 0.8
+  },
+  "stream": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "audio_endpoint": "/ws/audio",
+    "emotion_endpoint": "/ws/emotion"
+  }
+}
