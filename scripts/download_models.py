@@ -9,11 +9,15 @@ from huggingface_hub import snapshot_download
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download LLM and TTS assets")
+    default_llm_repo = "Qwen/Qwen3-4B-Instruct-2507"
     parser.add_argument(
         "--llm",
         type=str,
-        default="Qwen/Qwen2.5-4B-Instruct-AWQ",
-        help="Model repo id for the LLM",
+        default=default_llm_repo,
+        help=(
+            "Model repo id for the LLM (default: Qwen/Qwen3-4B-Instruct-2507). "
+            "Example: --llm Qwen/Qwen3-4B-Instruct-2507"
+        ),
     )
     parser.add_argument("--tts", type=str, default="nineninesix/kani-tts-370m-MLX", help="Model repo id for the TTS checkpoint")
     parser.add_argument("--output", type=Path, default=Path("models"), help="Destination directory")
@@ -28,10 +32,15 @@ def main() -> None:
     output_dir = args.output
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    llm_repo_id = args.llm
+    llm_dir_name = llm_repo_id.split("/")[-1] if llm_repo_id else "llm"
+    llm_dir = output_dir / "llm" / llm_dir_name
+    llm_dir.mkdir(parents=True, exist_ok=True)
+
     snapshot_download(
-        repo_id=args.llm,
+        repo_id=llm_repo_id,
         revision=args.revision,
-        local_dir=str(output_dir / "llm"),
+        local_dir=str(llm_dir),
         local_dir_use_symlinks=False,
     )
 
@@ -43,7 +52,9 @@ def main() -> None:
             local_dir_use_symlinks=False,
         )
 
-    print("Download complete. Configure config/default_config.json to point to the new model paths.")
+    print(
+        f"Download complete. Point config/default_config.json -> llm.model_name_or_path to: {llm_dir}"
+    )
 
 if __name__ == "__main__":
     main()

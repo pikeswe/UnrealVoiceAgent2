@@ -1,6 +1,6 @@
 # Nova – Local Unreal AI Companion
 
-Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct AWQ), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
+Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen3-4B-Instruct-2507), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
 codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
@@ -62,11 +62,11 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
    > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
 
 4. **Download the models**
-   * **LLM (Qwen 2.5 4B Instruct AWQ)**
+   * **LLM (Qwen3-4B-Instruct-2507)**
      ```powershell
-     python scripts/download_models.py --llm Qwen/Qwen2.5-4B-Instruct-AWQ --output models
+     python scripts/download_models.py --output models
      ```
-     Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (default `models/Qwen2.5-4B-Instruct-AWQ`).
+     Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (default `models/llm/Qwen3-4B-Instruct-2507`).
 
    * **Kani-TTS** – the synthesiser code is vendored inside this repository; you only need the checkpoint weights. Use the helper script to grab them from Hugging Face:
      ```powershell
@@ -121,7 +121,7 @@ The status panel displays:
 
 ## 5. How It Works
 
-1. **LLM Engine (`LLM/engine.py`)** – loads Qwen 2.5 4B Instruct AWQ locally via `transformers`, instructs it to always answer with `{ "emotion": ..., "text": ... }`, and parses the output.
+1. **LLM Engine (`LLM/engine.py`)** – loads Qwen3-4B-Instruct-2507 locally via `transformers`, instructs it to always answer with `{ "emotion": ..., "text": ... }`, and parses the output.
 2. **Emotion Mapper (`Utils/emotions.py`)** – converts the textual emotion into slider weights for MetaHuman.
 3. **Kani-TTS (`TTS/kani_engine.py`)** – streams PCM16 chunks as soon as they are generated.
 4. **Stream Server (`Server/streaming.py`)** – FastAPI WebSocket broadcaster that Unreal connects to.

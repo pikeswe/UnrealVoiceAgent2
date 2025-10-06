@@ -7,7 +7,6 @@ from typing import AsyncIterator, Optional
 
 import numpy as np
 
-codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 from TTS.kani_tts import KaniSynthesizer
 
 

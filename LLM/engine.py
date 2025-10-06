@@ -37,8 +37,8 @@ class LLMConfig:
 class LLMEngine:
     """Wrapper around a Hugging Face causal language model.
 
-    The class is designed to work with models such as Qwen 2.5 4B Instruct
-    AWQ and its quantised derivatives. Only open-source, locally hosted models are
+    The class is designed to work with models such as Qwen3 4B Instruct
+    and its quantised derivatives. Only open-source, locally hosted models are
     supported; no remote endpoints are contacted.
     """
 
@@ -47,6 +47,7 @@ class LLMEngine:
         self._model = None
         self._tokenizer = None
         self._streamer: Optional[TextIteratorStreamer] = None
+        self._is_qwen3 = False
 
     def load(self) -> None:
         """Loads the tokenizer and model into memory."""
@@ -55,6 +56,12 @@ class LLMEngine:
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.config.model_name_or_path, use_fast=True
         )
+
+        tokenizer_name = getattr(self._tokenizer, "name_or_path", "") or ""
+        config_path = self.config.model_name_or_path or ""
+        self._is_qwen3 = "qwen3" in tokenizer_name.lower() or "qwen3" in config_path.lower()
+        if self._is_qwen3:
+            logger.info("Detected Qwen3 tokenizer; using chat template prompting.")
 
         model_kwargs: Dict[str, object] = {}
         if self.config.quantization and self.config.quantization.lower() in {"awq", "int4"}:
@@ -85,12 +92,34 @@ class LLMEngine:
         segments.append(f"<|user|>\n{user_message}\n<|assistant|>")
         return "\n".join(segments)
 
+    def _build_chat_messages(
+        self, user_message: str, chat_history: Optional[List[Dict[str, str]]] = None
+    ) -> List[Dict[str, str]]:
+        messages: List[Dict[str, str]] = []
+        if self.config.system_prompt:
+            messages.append({"role": "system", "content": self.config.system_prompt})
+        if chat_history:
+            for turn in chat_history:
+                messages.append({"role": "user", "content": turn["user"]})
+                messages.append({"role": "assistant", "content": turn["assistant"]})
+        messages.append({"role": "user", "content": user_message})
+        return messages
+
     def generate(self, user_message: str, chat_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, str]:
         if not self.is_ready:
             raise RuntimeError("LLMEngine.generate called before load().")
 
-        prompt = self._build_prompt(user_message, chat_history)
-        inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
+        if self._is_qwen3:
+            messages = self._build_chat_messages(user_message, chat_history)
+            prompt_text = self._tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=False,
+            )
+            inputs = self._tokenizer(prompt_text, return_tensors="pt").to(self._model.device)
+        else:
+            prompt_text = self._build_prompt(user_message, chat_history)
+            inputs = self._tokenizer(prompt_text, return_tensors="pt").to(self._model.device)
 
         streamer = TextIteratorStreamer(self._tokenizer, skip_prompt=True, skip_special_tokens=True)
         generation_kwargs = dict(
