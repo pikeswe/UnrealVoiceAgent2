@@ -1,100 +1,162 @@
-## 🧠 Codex Project Prompt — “Local Unreal AI Companion (Standalone)”
+# Nova – Local Unreal AI Companion
 
-**System Role:**  
-You are an expert AI systems engineer tasked with developing a **local, offline, real-time AI voice companion** for **Unreal Engine 5.6**.  
-Everything must be **self-contained**, **open source**, **commercially usable**, **uncensored**, and **offline** — with **no dependency on Ollama, virtual audio cables, or cloud APIs**.
+Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
+
+The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
+
+## Project Layout
+
+```
+├── Interface/             # PyQt6 control panel
+├── LLM/                   # Local language model wrapper
+├── TTS/                   # Kani-TTS streaming wrapper
+├── Server/                # FastAPI WebSocket broadcast server
+├── Utils/                 # Orchestration helpers + emotion mapping
+├── config/                # JSON configuration profiles
+├── scripts/               # Optional setup scripts (model downloads, etc.)
+├── app.py                 # GUI entry point
+└── requirements.txt       # Python dependencies
+```
+
+## 1. System Requirements
+
+* **OS**: Windows 11 (developed cross-platform, but optimised for Windows)
+* **GPU**: RTX 4080 Super (16 GB) recommended. Quantised models (INT4/GPTQ/AWQ) allow use on 8 GB cards.
+* **Storage**: ~12 GB for the LLM + 2 GB for Kani-TTS models.
+* **Python**: 3.10 or 3.11 (64-bit). Install from [python.org](https://www.python.org/downloads/).
+
+## 2. Quick Architecture Tour
+
+If you want a high-level explanation before diving in, start here:
+
+1. **You type or speak** using the control panel.
+2. **`VoiceAgentOrchestrator`** (in `Utils/orchestrator.py`) forwards the text to the local LLM.
+3. **`LLMEngine`** (in `LLM/engine.py`) generates the reply and an emotion label in JSON form.
+4. **`EmotionMapper`** (in `Utils/emotions.py`) converts that label into slider weights for Unreal.
+5. **`KaniTTSEngine`** (in `TTS/kani_engine.py`) immediately begins streaming audio chunks as the sentence is decoded.
+6. **`StreamingServer`** (in `Server/streaming.py`) relays audio + emotion data to WebSocket clients (Unreal Live Link).
+7. The control panel (`Interface/control_panel.py`) keeps everything in sync, shows logs, and lets you start/stop the stack.
+
+Every piece is modular. Swap to a different LLM or TTS by updating the corresponding wrapper and the config file—no UI changes required.
+
+## 3. Installation
+
+1. **Clone the repo**
+   ```powershell
+   git clone https://github.com/your-org/NovaVoiceAgent.git
+   cd NovaVoiceAgent
+   ```
+
+2. **Create a virtual environment** (optional but recommended)
+   ```powershell
+   py -3.11 -m venv .venv
+   .venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```powershell
+   pip install -r requirements.txt
+   ```
+   > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
+
+4. **Download the models**
+   * **LLM (Qwen 2.5 4B Instruct, GPTQ or FP16)**
+     ```powershell
+     python scripts/download_models.py --llm Qwen/Qwen2.5-4B-Instruct-GPTQ-Int4 --output models
+     ```
+     Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (e.g. `models/llm`).
+
+   * **Kani-TTS** – the synthesiser code is vendored inside this repository; you only need the checkpoint weights. Use the helper script to grab them from Hugging Face:
+     ```powershell
+     python scripts/download_models.py --tts nineninesix/kani-tts-370m-MLX
+     ```
+     The files land in `models/kani_tts`. Update `config/default_config.json` → `tts.model_dir` if you choose a different path.
+     Install `nemo_toolkit[tts]` if you haven't already to run the high-fidelity decoder.
+
+5. **Configure the app**
+   * Edit `config/default_config.json` to match your hardware and preferred voices.
+   * Optional: save additional profiles in `config/` and load them via `python app.py --config config/my_setup.json`.
+
+### Using Anaconda instead of `venv`
+
+If you prefer Anaconda/Miniconda, you can follow the same steps inside a Conda environment:
+
+```powershell
+conda create -n nova python=3.11
+conda activate nova
+pip install -r requirements.txt
+```
+
+Conda installs Python and core scientific libraries, while `pip` pulls the exact packages listed in `requirements.txt`. The rest of the instructions (model downloads, configuration, running the control panel) stay identical.
+
+## 3. Running the Control Panel
+
+```powershell
+python app.py
+```
+
+1. Click **Start Servers** to load the LLM + TTS and expose the WebSocket endpoints.
+2. Type into the chat bar or edit the personality prompt before starting.
+3. As soon as you send a message, Nova replies while streaming audio to Unreal.
+
+The status panel displays:
+* `Audio Stream`: `ws://<host>:<port>/ws/audio` – connect this in Live Link.
+* `Emotion Stream`: `ws://<host>:<port>/ws/emotion` – optional metadata channel.
+
+## 4. Unreal Engine Integration
+
+1. Open **Live Link** in Unreal Engine 5.6 and click **Add Source → Message Bus Source**.
+2. Enter the audio endpoint from the control panel (default `ws://localhost:5000/ws/audio`).
+3. Assign the stream to your MetaHuman Animator asset.
+4. Add a custom Live Link subject for emotions:
+   * Create a blueprint that opens a WebSocket to `ws://localhost:5000/ws/emotion`.
+   * Parse the incoming JSON payload (slider names → values 0–1).
+   * Feed the values to the MetaHuman facial controls or to ZenBlink/ZenDyn once installed.
+5. Test by typing a message. Nova should speak within ~1 second and the emotion sliders will animate.
+
+> **Tip:** Unreal 5.6 can buffer a few frames of audio. Reduce buffer size in the audio device settings if latency exceeds 1 second.
+
+## 5. How It Works
+
+1. **LLM Engine (`LLM/engine.py`)** – loads Qwen locally via `transformers`, instructs it to always answer with `{ "emotion": ..., "text": ... }`, and parses the output.
+2. **Emotion Mapper (`Utils/emotions.py`)** – converts the textual emotion into slider weights for MetaHuman.
+3. **Kani-TTS (`TTS/kani_engine.py`)** – streams PCM16 chunks as soon as they are generated.
+4. **Stream Server (`Server/streaming.py`)** – FastAPI WebSocket broadcaster that Unreal connects to.
+5. **Orchestrator (`Utils/orchestrator.py`)** – glues everything together, feeding audio + emotion into the broadcast queues.
+6. **Control Panel (`Interface/control_panel.py`)** – PyQt6 UI for creatives. Run/stop servers, adjust prompts, chat, and monitor logs.
+
+All components are modular. Swap the LLM or TTS by editing the respective wrapper and config.
+
+## 6. Latency Optimisation
+
+* Enable **CUDA** by installing `torch` with GPU support (`pip install torch --index-url https://download.pytorch.org/whl/cu121`).
+* Use quantised checkpoints (`GPTQ`, `AWQ`, `INT4`) for faster decoding on 8 GB GPUs.
+* Lower `max_new_tokens` in `config/default_config.json` for shorter responses.
+* Adjust `tts.chunk_size` to 512 or 768 for earlier playback start (with minor CPU overhead).
+* Run the control panel and Unreal on the same machine to avoid network hops.
+
+## 7. Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| GUI hangs on start | Ensure GPU drivers are up-to-date and the model path in the config exists. Check the log panel for Python exceptions. |
+| No audio in Unreal | Confirm Live Link is bound to the correct WebSocket URL and the firewall allows local connections. |
+| Distorted speech | Increase `tts.chunk_size` or confirm the sample rate matches Unreal’s audio project settings. |
+| Emotions not moving | Open the emotion WebSocket in a browser (`wscat`) to verify JSON payloads. Map the keys to your blend shapes. |
+
+## 8. Extending the System
+
+* **Voice cloning** – train a new Kani-TTS speaker and change `tts.voice`.
+* **ZenBlink / ZenDyn** – extend `EmotionMapper` to emit preset IDs alongside slider values.
+* **Speech input** – add a Whisper model and pipe transcripts into `VoiceAgentOrchestrator.process_text()`.
+* **Scripting** – reuse the orchestrator module inside other Python tools or batch scripts.
+
+## 9. License
+
+All dependencies used are open-source and compatible with commercial projects. Please review their individual licences (Qwen, Kani-TTS, FastAPI, etc.) to ensure compliance with your distribution model.
+
+The directory `TTS/kani_tts` vendors the upstream [Kani-TTS](https://github.com/nineninesix-ai/kani-tts) implementation under the terms of the Apache 2.0 licence included in that folder.
 
 ---
 
-### 🧩 Project Description
-We’re creating an **AI-driven NPC companion** that speaks and reacts in real time inside Unreal Engine.  
-The NPC should:
-
-1. Receive text or voice input from the user.  
-2. Process it with a **local LLM (e.g., Qwen 3 4B)** or equivalent that runs directly in Python or C++ (no Ollama).  
-3. Generate a response with both **text** and **emotion tag** output.  
-4. Pass the text to **Kani-TTS** for **real-time streaming synthesis**.  
-5. Stream the audio via a **local WebSocket or HTTP audio stream** to Unreal Engine’s **Live Link Hub**, where it drives **MetaHuman Animator facial animation**.  
-6. Send emotion data to Unreal (WebSocket or UDP) to control **facial emotion parameters** (currently using Unreal’s built-in emotion sliders 0–1).  
-
-Later, the system should support **ZenBlink** and **ZenDyn** plugins to trigger complex emotion presets automatically based on LLM output.
-
-The goal is for the NPC to start speaking **within one second** of user input.
-
----
-
-### 🧱 Technical Requirements
-
-**LLM (Text Generation)**  
-- Use **Qwen 3 4B** or another open-source LLM that supports **local inference** on Windows.  
-- Load the model directly using Python libraries such as **transformers** or **vLLM** (no Ollama).  
-- Use quantized formats (e.g., GGUF or INT4) to reduce VRAM load for mid-range PCs.  
-- Output structured JSON:  
-  ```json
-  { "emotion": "Happy", "text": "Sure, I can help with that!" }
-  ```
-
-**TTS (Text-to-Speech)**  
-- Integrate **Kani-TTS** locally for real-time synthesis.  
-- Implement **audio chunking/pipelining** so speech begins playback as it’s generated.  
-- Output the audio stream through a **built-in WebSocket or REST endpoint**, *not* a virtual audio cable.  
-- Optimize latency (< 1 s) while keeping natural voice quality.
-
-**Emotion System**  
-- Extract emotion from LLM output text only (no audio or vision input).  
-- Supported emotions: `Neutral, Happy, Sad, Angry, Disgust, Fear, Surprise`.  
-- Emit emotion data via WebSocket/UDP to Unreal alongside audio stream metadata.  
-- Compatible with Unreal’s **0–1 emotion sliders** in the base Live Link.  
-- Future support for **ZenBlink** and **ZenDyn emotion presets**.
-
-**UI / Desktop App**  
-- Desktop GUI built with **Python + PyQt6** (preferred) or **Electron**.  
-- Must include:  
-  - Personality prompt input box  
-  - Chat box or mic input toggle  
-  - Start/Stop buttons for local servers (LLM, TTS, WebSocket)  
-  - Display of generated WebSocket/HTTP address for Unreal integration (`ws://localhost:5000/audio`)  
-  - Optional log/console window for debugging  
-
-**Unreal Engine Integration**  
-- Unreal receives audio via **Live Link** connected to the WebSocket stream.  
-- Unreal also receives emotion data for driving **MetaHuman facial blend-shapes**.  
-- Document step-by-step how to connect the Live Link input.  
-
----
-
-### ⚙️ Performance & Compatibility
-- Must run offline on **Windows 11**, optimized for **RTX 4080 Super (16 GB VRAM)**.  
-- Should also scale to mid-range GPUs (8 GB VRAM) with quantized model options.  
-- Keep all dependencies portable and minimal — ideally installable through `requirements.txt`.  
-- No need for Docker or external runtimes.  
-
----
-
-### 📦 Deliverables
-Codex should:
-1. Generate a **clean, modular folder structure** (e.g. `/Interface`, `/LLM`, `/TTS`, `/Server`, `/Output`).  
-2. Implement all backend logic:  
-   - Local LLM inference  
-   - Emotion extraction  
-   - Kani-TTS audio streaming  
-   - WebSocket/HTTP streaming to Unreal  
-3. Create the **UI control panel**.  
-4. Write **setup scripts** and a **README.md** with install and usage instructions.  
-5. Comment all code and include troubleshooting notes.  
-
----
-
-### 👤 Developer Context
-The user is a creative developer and 3D artist with 6–7 years of design experience, good technical understanding, and basic familiarity with Unreal Engine and GitHub.  
-They can follow step-by-step instructions but are **not a programmer**.  
-Therefore, write **clear explanations, structured documentation, and human-readable comments** throughout.
-
----
-
-### 🚀 Primary Goals
-1. 100 % offline operation  
-2. Real-time (< 1 s) response from user input to TTS playback  
-3. Seamless audio and emotion streaming to Unreal Engine  
-4. Optimized for mid-to-high-range Windows PCs  
-5. Modular and extensible for later upgrades (e.g., voice cloning, ZenBlink/ZenDyn emotion integration)
+Happy building, and enjoy bringing Nova to life inside Unreal!
