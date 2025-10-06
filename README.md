@@ -1,4 +1,5 @@
 # Nova – Local Unreal AI Companion
+codex/develop-local-ai-voice-companion-for-unreal-rjlcta
 
 Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
 
@@ -25,7 +26,21 @@ The repository is structured so creative developers can launch the control panel
 * **Storage**: ~12 GB for the LLM + 2 GB for Kani-TTS models.
 * **Python**: 3.10 or 3.11 (64-bit). Install from [python.org](https://www.python.org/downloads/).
 
-## 2. Installation
+## 2. Quick Architecture Tour
+
+If you want a high-level explanation before diving in, start here:
+
+1. **You type or speak** using the control panel.
+2. **`VoiceAgentOrchestrator`** (in `Utils/orchestrator.py`) forwards the text to the local LLM.
+3. **`LLMEngine`** (in `LLM/engine.py`) generates the reply and an emotion label in JSON form.
+4. **`EmotionMapper`** (in `Utils/emotions.py`) converts that label into slider weights for Unreal.
+5. **`KaniTTSEngine`** (in `TTS/kani_engine.py`) immediately begins streaming audio chunks as the sentence is decoded.
+6. **`StreamingServer`** (in `Server/streaming.py`) relays audio + emotion data to WebSocket clients (Unreal Live Link).
+7. The control panel (`Interface/control_panel.py`) keeps everything in sync, shows logs, and lets you start/stop the stack.
+
+Every piece is modular. Swap to a different LLM or TTS by updating the corresponding wrapper and the config file—no UI changes required.
+
+## 3. Installation
 
 1. **Clone the repo**
    ```powershell
@@ -61,6 +76,18 @@ The repository is structured so creative developers can launch the control panel
    * Edit `config/default_config.json` to match your hardware and preferred voices.
    * Optional: save additional profiles in `config/` and load them via `python app.py --config config/my_setup.json`.
 
+### Using Anaconda instead of `venv`
+
+If you prefer Anaconda/Miniconda, you can follow the same steps inside a Conda environment:
+
+```powershell
+conda create -n nova python=3.11
+conda activate nova
+pip install -r requirements.txt
+```
+
+Conda installs Python and core scientific libraries, while `pip` pulls the exact packages listed in `requirements.txt`. The rest of the instructions (model downloads, configuration, running the control panel) stay identical.
+
 ## 3. Running the Control Panel
 
 ```powershell
@@ -76,6 +103,7 @@ The status panel displays:
 * `Emotion Stream`: `ws://<host>:<port>/ws/emotion` – optional metadata channel.
 
 ## 4. Unreal Engine Integration
+
 
 1. Open **Live Link** in Unreal Engine 5.6 and click **Add Source → Message Bus Source**.
 2. Enter the audio endpoint from the control panel (default `ws://localhost:5000/ws/audio`).
