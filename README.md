@@ -1,6 +1,6 @@
 # Nova – Local Unreal AI Companion
 
-Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
+Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 3 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
 codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
@@ -62,9 +62,9 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
    > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
 
 4. **Download the models**
-   * **LLM (Qwen 2.5 4B Instruct, GPTQ or FP16)**
+   * **LLM (Qwen 3 4B Instruct, GPTQ or FP16)**
      ```powershell
-     python scripts/download_models.py --llm Qwen/Qwen2.5-4B-Instruct-GPTQ-Int4 --output models
+     python scripts/download_models.py --llm Qwen/Qwen3-4B-Instruct --output models
      ```
      Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (e.g. `models/llm`).
 
