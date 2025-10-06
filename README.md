@@ -76,6 +76,21 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
      Install `nemo_toolkit[tts]` if you haven't already to run the high-fidelity decoder.
 
 
+## Unreal Engine Setup
+
+The Unreal plugin is optional; the Python control panel works without it. When you want Unreal to mirror Nova’s speech and
+emotions, follow these steps:
+
+1. Copy the entire `UnrealIntegration/NovaLink/` folder from this repository into your Unreal project’s `Plugins/` directory
+   (create the folder if it does not exist).
+2. Launch Unreal Engine 5.6, open **Edit → Plugins**, and enable **NovaLink**. Restart the editor if prompted.
+3. Open the **Live Link** panel and add the **NovaLink: Audio** source.
+4. Add a second Live Link source named **NovaLink: Emotion** and point it to `ws://localhost:5000/ws/emotion`.
+5. In your Blueprint graph, bind the **OnAudioChunkReceived** and **OnEmotionUpdate** events to your MetaHuman or other animation
+   controllers. The plugin’s Blueprint function library includes helpers for quickly spawning the receivers.
+6. If you notice playback lag, reduce the audio buffer in **Project Settings → Audio → Buffer Queue** to tighten latency.
+
+
 5. **Configure the app**
    * Edit `config/default_config.json` to match your hardware and preferred voices.
    * Optional: save additional profiles in `config/` and load them via `python app.py --config config/my_setup.json`.
@@ -108,16 +123,17 @@ The status panel displays:
 
 ## 4. Unreal Engine Integration
 
-1. Open **Live Link** in Unreal Engine 5.6 and click **Add Source → Message Bus Source**.
-2. Enter the audio endpoint from the control panel (default `ws://localhost:5000/ws/audio`).
-3. Assign the stream to your MetaHuman Animator asset.
-4. Add a custom Live Link subject for emotions:
-   * Create a blueprint that opens a WebSocket to `ws://localhost:5000/ws/emotion`.
-   * Parse the incoming JSON payload (slider names → values 0–1).
-   * Feed the values to the MetaHuman facial controls or to ZenBlink/ZenDyn once installed.
-5. Test by typing a message. Nova should speak within ~1 second and the emotion sliders will animate.
+1. After enabling the NovaLink plugin, open **Window → Virtual Production → Live Link**.
+2. Click **Add Source → NovaLink: Audio** and confirm the default URL `ws://localhost:5000/ws/audio` matches your control panel.
+3. Add **NovaLink: Emotion** and leave the default URL (`ws://localhost:5000/ws/emotion`) unless you changed the server host.
+4. Create a Blueprint (Actor or Component) and use the **NovaLink Function Library** nodes to spawn Audio/Emotion receivers. Bind
+   **OnAudioChunkReceived** to an audio component or MetaHuman Animator, and **OnEmotionUpdate** to the blend shape logic of your
+   character.
+5. Start the UnrealVoiceAgent servers, press play, and send a message. You should hear audio immediately while the Live Link
+   subject animates from the emotion JSON stream.
 
-> **Tip:** Unreal 5.6 can buffer a few frames of audio. Reduce buffer size in the audio device settings if latency exceeds 1 second.
+> **Tip:** Unreal 5.6 can buffer a few frames of audio. Reduce the buffer size in the audio device settings or tweak the
+> Blueprint audio queue if latency exceeds ~1 second.
 
 ## 5. How It Works
 
