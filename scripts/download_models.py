@@ -40,6 +40,5 @@ def main() -> None:
 
     print("Download complete. Configure config/default_config.json to point to the new model paths.")
 
-
 if __name__ == "__main__":
     main()

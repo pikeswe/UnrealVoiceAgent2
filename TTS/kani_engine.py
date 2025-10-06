@@ -7,7 +7,9 @@ from typing import AsyncIterator, Optional
 
 import numpy as np
 
+codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 from TTS.kani_tts import KaniSynthesizer
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class KaniTTSEngine:
         self._synth: Optional[KaniSynthesizer] = None
 
     async def load(self) -> None:
+
         logger.info("Loading Kani-TTS models from %s", self.config.model_dir)
         self._synth = KaniSynthesizer(
             model_path=str(self.config.model_dir),
