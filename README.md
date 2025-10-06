@@ -1,6 +1,7 @@
 # Nova – Local Unreal AI Companion
 
 Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen 2.5 4B Instruct), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
+codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
 
@@ -53,10 +54,12 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
    .venv\Scripts\activate
    ```
 
+
 3. **Install dependencies**
    ```powershell
    pip install -r requirements.txt
    ```
+   > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
 
 4. **Download the models**
    * **LLM (Qwen 2.5 4B Instruct, GPTQ or FP16)**
@@ -65,11 +68,13 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
      ```
      Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (e.g. `models/llm`).
 
-   * **Kani-TTS** – download the official release and place it under `models/kani_tts`. The open-source package ships with a CLI download helper:
+   * **Kani-TTS** – the synthesiser code is vendored inside this repository; you only need the checkpoint weights. Use the helper script to grab them from Hugging Face:
      ```powershell
-     kani-tts download --output models/kani_tts
+     python scripts/download_models.py --tts nineninesix/kani-tts-370m-MLX
      ```
-     (If the CLI is unavailable, follow the manual instructions in the Kani-TTS README and set `tts.model_dir` accordingly.)
+     The files land in `models/kani_tts`. Update `config/default_config.json` → `tts.model_dir` if you choose a different path.
+     Install `nemo_toolkit[tts]` if you haven't already to run the high-fidelity decoder.
+
 
 5. **Configure the app**
    * Edit `config/default_config.json` to match your hardware and preferred voices.
@@ -150,8 +155,12 @@ All components are modular. Swap the LLM or TTS by editing the respective wrappe
 * **Scripting** – reuse the orchestrator module inside other Python tools or batch scripts.
 
 ## 9. License
+codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 All dependencies used are open-source and compatible with commercial projects. Please review their individual licences (Qwen, Kani-TTS, FastAPI, etc.) to ensure compliance with your distribution model.
+
+The directory `TTS/kani_tts` vendors the upstream [Kani-TTS](https://github.com/nineninesix-ai/kani-tts) implementation under the terms of the Apache 2.0 licence included in that folder.
+
 
 ---
 
