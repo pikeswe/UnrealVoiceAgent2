@@ -9,7 +9,7 @@ from huggingface_hub import snapshot_download
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download LLM and TTS assets")
-    parser.add_argument("--llm", type=str, default="Qwen/Qwen2.5-4B-Instruct", help="Model repo id for the LLM")
+    parser.add_argument("--llm", type=str, default="Qwen/Qwen3-4B-Instruct", help="Model repo id for the LLM")
     parser.add_argument("--tts", type=str, default="nineninesix/kani-tts-370m-MLX", help="Model repo id for the TTS checkpoint")
     parser.add_argument("--output", type=Path, default=Path("models"), help="Destination directory")
     parser.add_argument("--revision", type=str, default="main", help="Specific revision to download")
