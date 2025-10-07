@@ -2,14 +2,8 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import AsyncIterator, Optional
-
-from .windows_compat import ensure_windows_nemo_text_processing
-
-if os.name == "nt":
-    ensure_windows_nemo_text_processing()
 
 import numpy as np
 
