@@ -53,18 +53,29 @@ class KaniTTSEngine:
     def is_ready(self) -> bool:
         return self._synth is not None
 
-    async def synthesize_stream(self, text: str) -> AsyncIterator[bytes]:
+    async def synthesize_stream(
+        self,
+        text: str,
+        *,
+        sample_rate: Optional[int] = None,
+        temperature: Optional[float] = None,
+        chunk_size: Optional[int] = None,
+    ) -> AsyncIterator[bytes]:
         """Generates PCM16 audio chunks for the supplied text."""
         if not self.is_ready:
             raise RuntimeError("KaniTTSEngine.synthesize_stream called before load().")
 
         assert self._synth is not None
 
+        stream_sample_rate = sample_rate or self.config.sample_rate
+        stream_temperature = temperature if temperature is not None else self.config.temperature
+        stream_chunk_size = chunk_size or self.config.chunk_size
+
         stream = self._synth.stream(  # type: ignore[attr-defined]
             text=text,
-            sample_rate=self.config.sample_rate,
-            temperature=self.config.temperature,
-            chunk_size=self.config.chunk_size,
+            sample_rate=stream_sample_rate,
+            temperature=stream_temperature,
+            chunk_size=stream_chunk_size,
         )
 
         if hasattr(stream, "__aiter__"):

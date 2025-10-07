@@ -43,6 +43,9 @@ class KaniSynthesizer:
         self,
         text: str,
         *,
+        sample_rate: int | None = None,
+        chunk_size: int | None = None,
+        lookback_frames: int | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
         max_tokens: int | None = None,
@@ -56,6 +59,10 @@ class KaniSynthesizer:
 
         chunk_queue: "queue.Queue[tuple[str, Optional[np.ndarray] | Optional[str]]]" = queue.Queue()
 
+        stream_sample_rate = sample_rate or self.sample_rate
+        stream_chunk_size = chunk_size or self.chunk_size
+        stream_lookback_frames = lookback_frames or self.lookback_frames
+
         class _ChunkList(list):
             def append(self, chunk: np.ndarray) -> None:  # type: ignore[override]
                 super().append(chunk)
@@ -64,9 +71,9 @@ class KaniSynthesizer:
         writer = StreamingAudioWriter(
             self._player,
             output_file=None,
-            sample_rate=self.sample_rate,
-            chunk_size=self.chunk_size,
-            lookback_frames=self.lookback_frames,
+            sample_rate=stream_sample_rate,
+            chunk_size=stream_chunk_size,
+            lookback_frames=stream_lookback_frames,
         )
         writer.audio_chunks = _ChunkList()  # type: ignore[assignment]
 

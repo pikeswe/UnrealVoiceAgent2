@@ -71,15 +71,27 @@ class BackendWorker(QtCore.QThread):
         asyncio.run_coroutine_threadsafe(_task(), self.loop)
 
     def shutdown(self) -> None:
+        if self._shutting_down:
+            return
         if not self.loop or not self.orchestrator:
             return
 
+        self._shutting_down = True
+
         async def _shutdown() -> None:
-            await self.orchestrator.stop()
-            self.loop.stop()
+            if self.orchestrator:
+                await self.orchestrator.stop()
+                self.orchestrator = None
+            if self.loop:
+                self.loop.stop()
 
         future = asyncio.run_coroutine_threadsafe(_shutdown(), self.loop)
-        future.result()
+        try:
+            future.result(timeout=10)
+        except Exception as exc:  # pragma: no cover - GUI path
+            logger.exception("Backend shutdown failed: %s", exc)
+        finally:
+            self._shutting_down = False
 
     # Event sink callbacks -------------------------------------------------
     def audio_client_count_changed(self, count: int) -> None:  # type: ignore[override]
@@ -130,6 +142,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.backend_running = False
         self.audio_client_count = 0
         self.emotion_client_count = 0
+
         self._create_backend()
 
         self._setup_ui()
@@ -285,10 +298,21 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.status_label.setText("Status: Offline")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
+        if self._closing:
+            super().closeEvent(event)
+            return
+
+        self._closing = True
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.send_button.setEnabled(False)
+        self.input_box.setEnabled(False)
+
         try:
             if self.backend:
                 self.backend.shutdown()
-                self.backend.wait(2000)
+                # Wait until the backend thread exits so the streaming server stops cleanly.
+                self.backend.wait(5000)
                 self.backend = None
         finally:
             super().closeEvent(event)
