@@ -1,15 +1,13 @@
 """Audio player for LLM-generated speech tokens"""
 
-import torch
-import numpy as np
+from __future__ import annotations
 
-try:  # pragma: no cover - optional heavy dependency
-    from nemo.collections.tts.models import AudioCodecModel
-except ImportError as exc:  # pragma: no cover - optional heavy dependency
-    AudioCodecModel = None  # type: ignore
-    _IMPORT_ERROR = exc
-else:  # pragma: no cover - optional heavy dependency
-    _IMPORT_ERROR = None
+import importlib.util
+from functools import lru_cache
+from typing import TYPE_CHECKING, List
+
+import numpy as np
+import torch
 
 from .. import config
 
@@ -20,15 +18,66 @@ from ..config import (
 )
 
 
+if TYPE_CHECKING:  # pragma: no cover - help static analysis without importing Nemo at runtime
+    from nemo.collections.tts.models import AudioCodecModel  # noqa: F401
+
+
+_DEPENDENCY_HINT = (
+    "pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts] "
+    "lhotse==1.19.1 sentencepiece pandas"
+)
+
+_OPTIONAL_MODULES = {
+    "nemo": "nemo_toolkit[tts]",
+    "lhotse": "lhotse==1.19.1",
+    "sentencepiece": "sentencepiece>=0.2.0",
+    "pandas": "pandas>=2.0.0",
+}
+
+
+def _missing_optional_dependencies() -> List[str]:
+    """Return pip requirement strings for optional modules that are absent."""
+
+    missing: List[str] = []
+    for module_name, requirement in _OPTIONAL_MODULES.items():
+        if importlib.util.find_spec(module_name) is None:
+            missing.append(requirement)
+    return missing
+
+
+@lru_cache(maxsize=1)
+def _load_audio_codec_model():  # pragma: no cover - heavy dependency
+    """Import NeMo's ``AudioCodecModel`` lazily with clearer error messages."""
+
+    missing = _missing_optional_dependencies()
+    if missing:
+        requirement_list = ", ".join(missing)
+        raise RuntimeError(
+            "Missing dependencies for NeMo audio decoding: "
+            f"{requirement_list}. Install them via `{_DEPENDENCY_HINT}`."
+        )
+
+    try:
+        from nemo.collections.tts.models import AudioCodecModel  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError(
+            "nemo_toolkit[tts] is required for audio decoding. Install it via "
+            f"`{_DEPENDENCY_HINT}` and retry."
+        ) from exc
+
+    return AudioCodecModel
+
+
 class LLMAudioPlayer:
     def __init__(self, tokenizer) -> None:
-        if AudioCodecModel is None:
-            raise RuntimeError(
-                "nemo_toolkit[tts] is required for audio decoding. Install it via "
-                "`pip install nemo_toolkit[tts]` and retry."
-            ) from _IMPORT_ERROR
-        self.nemo_codec_model = AudioCodecModel\
-                .from_pretrained(config.CODEC_MODEL_NAME).eval()
+        try:
+            audio_codec_model = _load_audio_codec_model()
+        except RuntimeError as exc:
+            raise RuntimeError(str(exc)) from exc
+
+        self.nemo_codec_model = audio_codec_model.from_pretrained(
+            config.CODEC_MODEL_NAME
+        ).eval()
 
         if torch.cuda.is_available():
             self.device = 'cuda'
