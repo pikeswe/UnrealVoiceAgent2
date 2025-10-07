@@ -5,7 +5,23 @@
 
 class IWebSocket;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNovaLinkEmotionUpdate, const TMap<FString, float>&, EmotionValues);
+USTRUCT(BlueprintType)
+struct NOVALINK_API FNovaLinkEmotionData
+{
+    GENERATED_BODY()
+
+    FNovaLinkEmotionData() = default;
+
+    explicit FNovaLinkEmotionData(const TMap<FString, float>& InValues)
+        : EmotionValues(InValues)
+    {
+    }
+
+    UPROPERTY(BlueprintReadWrite, Category = "NovaLink|Emotion")
+    TMap<FString, float> EmotionValues;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNovaLinkEmotionUpdate, const FNovaLinkEmotionData&, EmotionData);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNovaLinkEmotionConnectionStateChanged, bool, bIsConnected);
 
 UCLASS(BlueprintType)

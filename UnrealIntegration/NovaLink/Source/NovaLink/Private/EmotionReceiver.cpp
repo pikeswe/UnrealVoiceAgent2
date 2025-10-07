@@ -93,7 +93,7 @@ void UEmotionReceiver::HandleMessage(const FString& Message)
     TMap<FString, float> ParsedValues;
     if (TryParseEmotionMessage(Message, ParsedValues))
     {
-        OnEmotionUpdate.Broadcast(ParsedValues);
+        OnEmotionUpdate.Broadcast(FNovaLinkEmotionData(ParsedValues));
     }
     else
     {
