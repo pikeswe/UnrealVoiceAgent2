@@ -6,7 +6,8 @@ import json
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Dict, Optional, Set
+from typing import Callable, Dict, Optional, Set
+
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,7 +53,13 @@ class BroadcastQueue:
 class StreamServer:
     """FastAPI application bundling the audio and emotion streaming endpoints."""
 
-    def __init__(self, config: StreamConfig):
+    def __init__(
+        self,
+        config: StreamConfig,
+        *,
+        on_audio_client_count_changed: Optional[Callable[[int], None]] = None,
+        on_emotion_client_count_changed: Optional[Callable[[int], None]] = None,
+    ):
         self.config = config
         self.app = FastAPI(title="Unreal Voice Agent Stream Server")
         self.app.add_middleware(
@@ -65,6 +72,11 @@ class StreamServer:
         self.audio_broadcast = BroadcastQueue()
         self.emotion_broadcast = BroadcastQueue()
 
+        self._audio_client_count = 0
+        self._emotion_client_count = 0
+        self._on_audio_client_count_changed = on_audio_client_count_changed
+        self._on_emotion_client_count_changed = on_emotion_client_count_changed
+
         self.app.websocket(self.config.audio_endpoint)(self._audio_handler)
         self.app.websocket(self.config.emotion_endpoint)(self._emotion_handler)
 
@@ -72,6 +84,8 @@ class StreamServer:
         await websocket.accept()
         listener_queue = await self.audio_broadcast.register()
         logger.info("Audio client connected: %s", websocket.client)
+        self._audio_client_count += 1
+        self._emit_audio_client_count()
         try:
             while True:
                 chunk = await listener_queue.get()
@@ -80,11 +94,15 @@ class StreamServer:
             logger.info("Audio client disconnected: %s", websocket.client)
         finally:
             await self.audio_broadcast.unregister(listener_queue)
+            self._audio_client_count = max(0, self._audio_client_count - 1)
+            self._emit_audio_client_count()
 
     async def _emotion_handler(self, websocket: WebSocket) -> None:
         await websocket.accept()
         listener_queue = await self.emotion_broadcast.register()
         logger.info("Emotion client connected: %s", websocket.client)
+        self._emotion_client_count += 1
+        self._emit_emotion_client_count()
         try:
             while True:
                 payload = await listener_queue.get()
@@ -93,6 +111,8 @@ class StreamServer:
             logger.info("Emotion client disconnected: %s", websocket.client)
         finally:
             await self.emotion_broadcast.unregister(listener_queue)
+            self._emotion_client_count = max(0, self._emotion_client_count - 1)
+            self._emit_emotion_client_count()
 
     async def push_audio(self, chunk: bytes) -> None:
         await self.audio_broadcast.broadcast(chunk)
@@ -100,6 +120,20 @@ class StreamServer:
     async def push_emotion(self, payload: Dict[str, float]) -> None:
         message = json.dumps(payload)
         await self.emotion_broadcast.broadcast(message.encode("utf-8"))
+
+    def _emit_audio_client_count(self) -> None:
+        if self._on_audio_client_count_changed:
+            try:
+                self._on_audio_client_count_changed(self._audio_client_count)
+            except Exception:  # pragma: no cover - defensive logging
+                logger.exception("Audio client count callback failed")
+
+    def _emit_emotion_client_count(self) -> None:
+        if self._on_emotion_client_count_changed:
+            try:
+                self._on_emotion_client_count_changed(self._emotion_client_count)
+            except Exception:  # pragma: no cover - defensive logging
+                logger.exception("Emotion client count callback failed")
 
 
 class StreamingServer:
