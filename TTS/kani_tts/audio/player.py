@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 from functools import lru_cache
 from typing import TYPE_CHECKING, List
-
 import numpy as np
 import torch
 
@@ -21,13 +20,13 @@ from ..config import (
 if TYPE_CHECKING:  # pragma: no cover - help static analysis without importing Nemo at runtime
     from nemo.collections.tts.models import AudioCodecModel  # noqa: F401
 
-
 _OPTIONAL_MODULES = {
     "nemo": "nemo_toolkit[tts]",
     "lhotse": "lhotse==1.19.1",
     "sentencepiece": "sentencepiece>=0.2.0",
     "pandas": "pandas>=2.0.0",
 }
+
 
 _INSTALL_HINTS = {
     "nemo": (
@@ -72,7 +71,6 @@ def _install_instructions(missing: List[str]) -> str:
     joined_hints = "\n".join(hints)
     return f"\nInstall the missing pieces with:\n{joined_hints}"
 
-
 @lru_cache(maxsize=1)
 def _load_audio_codec_model():  # pragma: no cover - heavy dependency
     """Import NeMo's ``AudioCodecModel`` lazily with clearer error messages."""
@@ -86,6 +84,7 @@ def _load_audio_codec_model():  # pragma: no cover - heavy dependency
             message = f"{message}{hints}"
         raise RuntimeError(message)
 
+
     try:
         from nemo.collections.tts.models import AudioCodecModel  # type: ignore
     except ImportError as exc:
@@ -93,6 +92,7 @@ def _load_audio_codec_model():  # pragma: no cover - heavy dependency
         install_msg = f" Install it via `{hint}` and retry." if hint else ""
         raise RuntimeError(
             "nemo_toolkit[tts] is required for audio decoding." + install_msg
+
         ) from exc
 
     return AudioCodecModel

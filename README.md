@@ -69,6 +69,7 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
    >
    > ```powershell
    > pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts]
+
    > ```
 
 4. **Download the models**
