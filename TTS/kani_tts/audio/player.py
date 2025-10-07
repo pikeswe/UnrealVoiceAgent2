@@ -10,6 +10,7 @@ import torch
 
 from .. import config
 
+from ...windows_compat import ensure_windows_nemo_text_processing
 from ..config import (
     TOKENIZER_LENGTH, START_OF_TEXT, END_OF_TEXT,
     START_OF_SPEECH, END_OF_SPEECH, START_OF_HUMAN, END_OF_HUMAN,
@@ -74,6 +75,8 @@ def _install_instructions(missing: List[str]) -> str:
 @lru_cache(maxsize=1)
 def _load_audio_codec_model():  # pragma: no cover - heavy dependency
     """Import NeMo's ``AudioCodecModel`` lazily with clearer error messages."""
+
+    ensure_windows_nemo_text_processing()
 
     missing = _missing_optional_dependencies()
     if missing:

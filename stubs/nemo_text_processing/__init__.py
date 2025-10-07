@@ -1,8 +1,7 @@
+"""Stub implementation of :mod:`nemo_text_processing` for Windows builds."""
+
 print("[INFO] Using stubbed nemo_text_processing (pynini disabled).")
 
-class Normalizer:
-    def __init__(self, *args, **kwargs):
-        pass
+from .text_normalization.normalize import Normalizer  # noqa: E402
 
-    def normalize(self, text, **kwargs):
-        return text
+__all__ = ["Normalizer"]

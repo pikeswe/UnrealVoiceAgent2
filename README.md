@@ -72,6 +72,18 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
 
    > ```
 
+### Windows NeMo compatibility
+
+Running NeMo's text-normalisation pipelines on Windows normally requires compiling `pynini`, which is not shipped for that platform.
+UnrealVoiceAgent now bundles a drop-in stub of `nemo_text_processing` that activates automatically when the real module fails to
+import. This keeps the AudioCodecModel working without sacrificing GPU acceleration.
+
+After installing dependencies, run the smoketest once to verify everything loads:
+
+```powershell
+python scripts/tts_smoketest.py --text "Hello world, this is Nova speaking." --out test.wav
+```
+
 4. **Download the models**
    * **LLM (Qwen3-4B-Instruct-2507)**
      ```powershell
