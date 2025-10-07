@@ -1,6 +1,8 @@
 # Nova – Local Unreal AI Companion
 
 Nova is a fully offline voice companion designed to drive a MetaHuman inside Unreal Engine 5.6. It combines a local LLM (tested with Qwen3-4B-Instruct-2507), Kani-TTS for streaming speech synthesis, and a low-latency WebSocket bridge that feeds audio plus emotion weights directly into Live Link.
+
+> **Note:** This project only supports Linux and WSL2 environments. Native Windows builds are not supported due to dependency conflicts (e.g., `pynini`, `nemo_toolkit`).
 codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
@@ -23,7 +25,7 @@ The repository is structured so creative developers can launch the control panel
 
 ## 1. System Requirements
 
-* **OS**: Windows 11 (developed cross-platform, but optimised for Windows)
+* **OS**: Ubuntu 22.04 LTS or WSL2 (Ubuntu distribution)
 * **GPU**: RTX 4080 Super (16 GB) recommended. Quantised models (INT4/AWQ) allow use on 8 GB cards.
 * **Storage**: ~12 GB for the LLM + 2 GB for Kani-TTS models.
 * **Python**: 3.10 or 3.11 (64-bit). Install from [python.org](https://www.python.org/downloads/).
@@ -44,59 +46,61 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
 
 ## 3. Installation
 
+### Option A: Automated WSL setup (recommended)
+
+1. Ensure [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is installed inside your WSL2 distribution.
+2. From the repository root, mark the helper script as executable:
+   ```bash
+   chmod +x scripts/setup_wsl.sh
+   ```
+3. Run the setup script. It creates the `nova` Conda environment, installs GPU-enabled dependencies, and validates CUDA access:
+   ```bash
+   ./scripts/setup_wsl.sh
+   ```
+
+### Option B: Manual environment setup
+
 1. **Clone the repo**
-   ```powershell
+   ```bash
+   mkdir -p ~/projects
+   cd ~/projects
    git clone https://github.com/your-org/NovaVoiceAgent.git
-   cd NovaVoiceAgent
+   cd UnrealVoiceAgent
    ```
 
 2. **Create a virtual environment** (optional but recommended)
-   ```powershell
-   py -3.11 -m venv .venv
-   .venv\Scripts\activate
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
-
 
 3. **Install dependencies**
-   ```powershell
+   ```bash
    pip install -r requirements.txt
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts]
+   pip install pynini
    ```
-   > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
-   >
-   > **Windows tip:** the NeMo installer occasionally skips a few Python wheel dependencies. If the TTS smoke test complains about
-   > missing modules such as `lhotse`, `sentencepiece`, or `pandas`, install only the reported package (for example `pip install pandas>=2.0.0`).
-   > If you still need the full decoder bundle, you can reinstall it with:
-   >
-   > ```powershell
-   > pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts]
-
-   > ```
-
-### Windows NeMo compatibility
-
-Running NeMo's text-normalisation pipelines on Windows normally requires compiling `pynini`, which is not shipped for that platform.
-UnrealVoiceAgent now bundles a drop-in stub of `nemo_text_processing` that activates automatically when the real module fails to
-import. This keeps the AudioCodecModel working without sacrificing GPU acceleration.
 
 After installing dependencies, run the smoketest once to verify everything loads:
 
-```powershell
+```bash
 python scripts/tts_smoketest.py --text "Hello world, this is Nova speaking." --out test.wav
 ```
 
 4. **Download the models**
    * **LLM (Qwen3-4B-Instruct-2507)**
-     ```powershell
+     ```bash
      python scripts/download_models.py --output models
      ```
      Update `config/default_config.json` → `llm.model_name_or_path` to the local folder (default `models/llm/Qwen3-4B-Instruct-2507`).
 
    * **Kani-TTS** – the synthesiser code is vendored inside this repository; you only need the checkpoint weights. Use the helper script to grab them from Hugging Face:
-     ```powershell
+     ```bash
      python scripts/download_models.py --tts nineninesix/kani-tts-370m-MLX
      ```
      The files land in `models/kani_tts`. Update `config/default_config.json` → `tts.model_dir` if you choose a different path.
-     Install `nemo_toolkit[tts]` if you haven't already to run the high-fidelity decoder.
+     Ensure `nemo_toolkit[tts]` is installed to run the high-fidelity decoder.
 
 
 ## Unreal Engine Setup
@@ -120,19 +124,20 @@ emotions, follow these steps:
 
 ### Using Anaconda instead of `venv`
 
-If you prefer Anaconda/Miniconda, you can follow the same steps inside a Conda environment:
+If you prefer Anaconda/Miniconda inside WSL2, mirror the manual setup steps within a Conda environment:
 
-```powershell
+```bash
 conda create -n nova python=3.11
 conda activate nova
 pip install -r requirements.txt
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts]
+pip install pynini
 ```
-
-Conda installs Python and core scientific libraries, while `pip` pulls the exact packages listed in `requirements.txt`. The rest of the instructions (model downloads, configuration, running the control panel) stay identical.
 
 ## 3. Running the Control Panel
 
-```powershell
+```bash
 python app.py
 ```
 
