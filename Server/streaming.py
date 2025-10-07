@@ -4,8 +4,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 from dataclasses import dataclass
-from typing import Dict, Set
+from typing import Dict, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -101,10 +102,91 @@ class StreamServer:
         await self.emotion_broadcast.broadcast(message.encode("utf-8"))
 
 
-async def serve(app: FastAPI, host: str, port: int) -> None:
-    """Launches the uvicorn server inside the current asyncio loop."""
-    import uvicorn
+class StreamingServer:
+    """Utility to run the FastAPI app inside a background uvicorn server."""
 
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
+    def __init__(self, app: FastAPI, host: str, port: int) -> None:
+        self._app = app
+        self._host = host
+        self._port = port
+        self._thread: Optional[threading.Thread] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._server: Optional["uvicorn.Server"] = None
+        self._started = threading.Event()
+        self._stopped = threading.Event()
+        self._lock = threading.Lock()
+
+    def start(self) -> None:
+        """Start uvicorn in a dedicated daemon thread."""
+        with self._lock:
+            if self._thread and self._thread.is_alive():
+                logger.debug("Streaming server already running")
+                return
+            self._started.clear()
+            self._stopped.clear()
+
+            def _run() -> None:
+                import uvicorn
+
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                config = uvicorn.Config(
+                    self._app,
+                    host=self._host,
+                    port=self._port,
+                    log_level="info",
+                )
+                server = uvicorn.Server(config)
+                server.install_signal_handlers = lambda: None  # type: ignore[assignment]
+
+                with self._lock:
+                    self._loop = loop
+                    self._server = server
+                self._started.set()
+
+                try:
+                    loop.run_until_complete(server.serve())
+                except Exception as exc:  # pragma: no cover - background thread
+                    logger.exception("Streaming server crashed: %s", exc)
+                finally:
+                    with self._lock:
+                        self._loop = None
+                        self._server = None
+                    try:
+                        loop.run_until_complete(loop.shutdown_asyncgens())
+                    finally:
+                        loop.close()
+                    self._stopped.set()
+                    self._started.set()
+
+            thread = threading.Thread(target=_run, name="StreamingServer", daemon=True)
+            self._thread = thread
+
+        thread.start()
+        self._started.wait()
+
+    def stop(self, timeout: Optional[float] = 5.0) -> None:
+        """Signal the uvicorn server to exit and wait for the thread to join."""
+        with self._lock:
+            thread = self._thread
+            server = self._server
+            loop = self._loop
+
+        if not thread:
+            logger.debug("Streaming server not running")
+            return
+
+        if server:
+            server.should_exit = True
+
+        if loop:
+            loop.call_soon_threadsafe(lambda: None)
+
+        self._stopped.wait(timeout)
+        thread.join(timeout)
+
+        with self._lock:
+            if self._thread is thread:
+                self._thread = None
+                self._loop = None
+                self._server = None

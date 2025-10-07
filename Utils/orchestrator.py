@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from LLM.engine import LLMConfig, LLMEngine
-from Server.streaming import StreamConfig, StreamServer, serve
+from Server.streaming import StreamConfig, StreamServer, StreamingServer
 from TTS.kani_engine import KaniTTSConfig, KaniTTSEngine
 from Utils.emotions import EmotionMapper
 
@@ -31,15 +30,22 @@ class VoiceAgentOrchestrator:
         self.tts = KaniTTSEngine(config.tts)
         self.stream_server = StreamServer(config.stream)
         self._emotion_mapper = EmotionMapper()
-        self._server_task: Optional[asyncio.Task] = None
+        self._streaming_server = StreamingServer(
+            self.stream_server.app,
+            config.stream.host,
+            config.stream.port,
+        )
+        self._started = False
 
     async def start(self) -> None:
+        if self._started:
+            logger.debug("Orchestrator already started")
+            return
         logger.info("Starting orchestrator")
         self.llm.load()
         await self.tts.load()
-        self._server_task = asyncio.create_task(
-            serve(self.stream_server.app, self.config.stream.host, self.config.stream.port)
-        )
+        self._streaming_server.start()
+        self._started = True
         logger.info(
             "Stream server running on ws://%s:%s%s",
             self.config.stream.host,
@@ -48,10 +54,10 @@ class VoiceAgentOrchestrator:
         )
 
     async def stop(self) -> None:
-        if self._server_task:
-            self._server_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._server_task
+        if not self._started:
+            return
+        await asyncio.to_thread(self._streaming_server.stop)
+        self._started = False
         logger.info("Orchestrator stopped")
 
     async def process_text(self, user_message: str, chat_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, str]:
