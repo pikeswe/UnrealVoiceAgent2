@@ -9,7 +9,11 @@ from typing import Optional
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from Utils.config import load_orchestrator_config
-from Utils.orchestrator import OrchestratorConfig, VoiceAgentOrchestrator
+from Utils.orchestrator import (
+    OrchestratorConfig,
+    TTSInitializationError,
+    VoiceAgentOrchestrator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,25 +25,32 @@ class BackendWorker(QtCore.QThread):
     response_ready = QtCore.pyqtSignal(str, str)
     error_occurred = QtCore.pyqtSignal(str)
     log_event = QtCore.pyqtSignal(str)
+    audio_client_count_update = QtCore.pyqtSignal(int)
+    emotion_client_count_update = QtCore.pyqtSignal(int)
 
     def __init__(self, config: OrchestratorConfig) -> None:
         super().__init__()
         self.config = config
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.orchestrator: Optional[VoiceAgentOrchestrator] = None
+        self._audio_client_count = 0
+        self._emotion_client_count = 0
 
     def run(self) -> None:  # type: ignore[override]
         try:
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
-            self.orchestrator = VoiceAgentOrchestrator(self.config)
+            self.orchestrator = VoiceAgentOrchestrator(self.config, event_sink=self)
             self.loop.run_until_complete(self.orchestrator.start())
             self.ready.emit()
             self.log_event.emit("Backend started. Listening for requests.")
             self.loop.run_forever()
         except Exception as exc:  # pragma: no cover - GUI path
             logger.exception("Backend crashed: %s", exc)
-            self.error_occurred.emit(str(exc))
+            message = self._format_backend_error(exc)
+            if message:
+                self.log_event.emit(message)
+            self.error_occurred.emit(message)
         finally:
             if self.loop and self.loop.is_running():
                 self.loop.call_soon_threadsafe(self.loop.stop)
@@ -70,6 +81,41 @@ class BackendWorker(QtCore.QThread):
         future = asyncio.run_coroutine_threadsafe(_shutdown(), self.loop)
         future.result()
 
+    # Event sink callbacks -------------------------------------------------
+    def audio_client_count_changed(self, count: int) -> None:  # type: ignore[override]
+        if count == self._audio_client_count:
+            return
+        message = (
+            "Audio client connected"
+            if count > self._audio_client_count
+            else "Audio client disconnected"
+        )
+        self._audio_client_count = count
+        self.log_event.emit(f"{message} ({count} total).")
+        self.audio_client_count_update.emit(count)
+
+    def emotion_client_count_changed(self, count: int) -> None:  # type: ignore[override]
+        if count == self._emotion_client_count:
+            return
+        message = (
+            "Emotion client connected"
+            if count > self._emotion_client_count
+            else "Emotion client disconnected"
+        )
+        self._emotion_client_count = count
+        self.log_event.emit(f"{message} ({count} total).")
+        self.emotion_client_count_update.emit(count)
+
+    def _format_backend_error(self, exc: Exception) -> str:
+        if isinstance(exc, TTSInitializationError):
+            detail = str(exc) or exc.__class__.__name__
+            return (
+                f"TTS initialization failed: {detail}\n"
+                "Please run scripts/tts_smoketest.py to troubleshoot."
+            )
+        detail = str(exc)
+        return detail or exc.__class__.__name__
+
 
 class ControlPanel(QtWidgets.QMainWindow):
     """Main window for controlling the local AI companion."""
@@ -81,6 +127,9 @@ class ControlPanel(QtWidgets.QMainWindow):
 
         self.config = load_orchestrator_config(config_path)
         self.backend: Optional[BackendWorker] = None
+        self.backend_running = False
+        self.audio_client_count = 0
+        self.emotion_client_count = 0
         self._create_backend()
 
         self._setup_ui()
@@ -147,6 +196,10 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.backend.response_ready.connect(self.on_response_ready)
         self.backend.error_occurred.connect(self.on_error)
         self.backend.log_event.connect(self.append_log)
+        self.backend.audio_client_count_update.connect(self.on_audio_client_count_changed)
+        self.backend.emotion_client_count_update.connect(
+            self.on_emotion_client_count_changed
+        )
 
     # Slots -----------------------------------------------------------------
     def on_start_clicked(self) -> None:
@@ -174,7 +227,10 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.backend = None
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
-        self.status_label.setText("Status: Offline")
+        self.backend_running = False
+        self.audio_client_count = 0
+        self.emotion_client_count = 0
+        self._update_status_label()
 
     def on_send_clicked(self) -> None:
         text = self.input_box.text().strip()
@@ -187,7 +243,10 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     def on_backend_ready(self) -> None:
         self.append_log("Backend ready. Connect Unreal Live Link to the audio endpoint.")
-        self.status_label.setText("Status: Online")
+        self.backend_running = True
+        self.audio_client_count = 0
+        self.emotion_client_count = 0
+        self._update_status_label()
         self.stop_button.setEnabled(True)
 
     def on_response_ready(self, emotion: str, text: str) -> None:
@@ -196,9 +255,34 @@ class ControlPanel(QtWidgets.QMainWindow):
     def on_error(self, message: str) -> None:
         self.append_log(f"Error: {message}")
         QtWidgets.QMessageBox.critical(self, "Backend Error", message)
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        if self.backend and self.backend.isFinished():
+            self.backend = None
+        self.backend_running = False
+        self.audio_client_count = 0
+        self.emotion_client_count = 0
+        self._update_status_label()
 
     def append_log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
+
+    def on_audio_client_count_changed(self, count: int) -> None:
+        self.audio_client_count = count
+        self._update_status_label()
+
+    def on_emotion_client_count_changed(self, count: int) -> None:
+        self.emotion_client_count = count
+        self._update_status_label()
+
+    def _update_status_label(self) -> None:
+        if self.backend_running:
+            self.status_label.setText(
+                "Status: Online | Audio clients: "
+                f"{self.audio_client_count} | Emotion clients: {self.emotion_client_count}"
+            )
+        else:
+            self.status_label.setText("Status: Offline")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
         try:

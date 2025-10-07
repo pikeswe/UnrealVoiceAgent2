@@ -5,7 +5,7 @@ import asyncio
 import contextlib
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Protocol
 
 from LLM.engine import LLMConfig, LLMEngine
 from Server.streaming import StreamConfig, StreamServer, serve
@@ -22,21 +22,45 @@ class OrchestratorConfig:
     stream: StreamConfig = field(default_factory=StreamConfig)
 
 
+class OrchestratorEventSink(Protocol):
+    def audio_client_count_changed(self, count: int) -> None:
+        ...
+
+    def emotion_client_count_changed(self, count: int) -> None:
+        ...
+
+
+class TTSInitializationError(RuntimeError):
+    """Raised when the TTS engine fails to initialize."""
+
+
 class VoiceAgentOrchestrator:
     """Glue object binding all sub systems together."""
 
-    def __init__(self, config: OrchestratorConfig):
+    def __init__(
+        self,
+        config: OrchestratorConfig,
+        event_sink: Optional[OrchestratorEventSink] = None,
+    ):
         self.config = config
         self.llm = LLMEngine(config.llm)
         self.tts = KaniTTSEngine(config.tts)
-        self.stream_server = StreamServer(config.stream)
+        self.event_sink = event_sink
+        self.stream_server = StreamServer(
+            config.stream,
+            on_audio_client_count_changed=self._handle_audio_client_count,
+            on_emotion_client_count_changed=self._handle_emotion_client_count,
+        )
         self._emotion_mapper = EmotionMapper()
         self._server_task: Optional[asyncio.Task] = None
 
     async def start(self) -> None:
         logger.info("Starting orchestrator")
         self.llm.load()
-        await self.tts.load()
+        try:
+            await self.tts.load()
+        except Exception as exc:
+            raise TTSInitializationError(str(exc)) from exc
         self._server_task = asyncio.create_task(
             serve(self.stream_server.app, self.config.stream.host, self.config.stream.port)
         )
@@ -72,3 +96,14 @@ class VoiceAgentOrchestrator:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.stop()
+
+    # Internal callbacks -------------------------------------------------
+    def _handle_audio_client_count(self, count: int) -> None:
+        logger.info("Audio client count changed: %s", count)
+        if self.event_sink:
+            self.event_sink.audio_client_count_changed(count)
+
+    def _handle_emotion_client_count(self, count: int) -> None:
+        logger.info("Emotion client count changed: %s", count)
+        if self.event_sink:
+            self.event_sink.emotion_client_count_changed(count)
