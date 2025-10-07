@@ -14,9 +14,7 @@ public class NovaLink : ModuleRules
             "InputCore",
             "Json",
             "JsonUtilities",
-            "Networking",
-            "Sockets",
-            "WebSockets"
+            "AudioMixer"
         });
 
         PrivateDependencyModuleNames.AddRange(new[]
