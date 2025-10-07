@@ -15,7 +15,8 @@ public class NovaLink : ModuleRules
             "Json",
             "JsonUtilities",
             "Networking",
-            "Sockets"
+            "Sockets",
+            "WebSockets"
         });
 
         PrivateDependencyModuleNames.AddRange(new[]
