@@ -64,10 +64,12 @@ Every piece is modular. Swap to a different LLM or TTS by updating the correspon
    > Optional: install NVIDIA's NeMo stack with `pip install nemo_toolkit[tts]` to enable the high-fidelity audio decoder bundled with Kani-TTS.
    >
    > **Windows tip:** the NeMo installer occasionally skips a few Python wheel dependencies. If the TTS smoke test complains about
-   > missing modules such as `lhotse`, `sentencepiece`, or `pandas`, fix everything in one go with:
+   > missing modules such as `lhotse`, `sentencepiece`, or `pandas`, install only the reported package (for example `pip install pandas>=2.0.0`).
+   > If you still need the full decoder bundle, you can reinstall it with:
    >
    > ```powershell
-   > pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts] lhotse==1.19.1 sentencepiece pandas
+   > pip install --extra-index-url https://pypi.nvidia.com nemo_toolkit[tts]
+
    > ```
 
 4. **Download the models**
