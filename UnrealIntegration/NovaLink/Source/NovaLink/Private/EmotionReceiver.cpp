@@ -1,9 +1,13 @@
 #include "EmotionReceiver.h"
 
 #include "IWebSocket.h"
-#include "JsonUtilities.h"
 #include "Modules/ModuleManager.h"
 #include "WebSocketsModule.h"
+
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 namespace
 {

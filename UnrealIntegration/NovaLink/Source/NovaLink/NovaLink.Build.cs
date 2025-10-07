@@ -12,8 +12,8 @@ public class NovaLink : ModuleRules
             "CoreUObject",
             "Engine",
             "InputCore",
-            "LiveLinkInterface",
-            "WebSockets",
+            "Json",
+            "JsonUtilities",
             "Networking",
             "Sockets"
         });
