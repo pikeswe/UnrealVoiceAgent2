@@ -2,8 +2,16 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import AsyncIterator, Optional
+
+if os.name == "nt":
+    stub_path = os.path.join(os.getcwd(), "stubs")
+    if os.path.isdir(stub_path):
+        sys.path.insert(0, stub_path)
+        print(f"[INFO] Added stub path: {stub_path}")
 
 import numpy as np
 
