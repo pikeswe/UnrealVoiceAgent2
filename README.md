@@ -5,6 +5,8 @@ codex/develop-local-ai-voice-companion-for-unreal-r86qn0
 
 The repository is structured so creative developers can launch the control panel, connect Unreal, and start iterating without touching Python code. Every dependency is open source and commercially usable.
 
+**Next: [Unreal Integration](UnrealIntegration/NovaLink/README.md)**
+
 ## Project Layout
 
 ```
