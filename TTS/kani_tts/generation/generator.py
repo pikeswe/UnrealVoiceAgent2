@@ -1,6 +1,7 @@
 """Text-to-speech generation logic"""
 
 import time
+import warnings
 from threading import Thread
 from typing import Optional
 
@@ -49,13 +50,24 @@ class TTSGenerator:
         torch_dtype: torch.dtype = torch.bfloat16,
         device_map: str = "auto",
     ) -> None:
-        model_path = model_name or MODEL_NAME
+        self.model_path = model_name or MODEL_NAME
+
+        warnings.warn(
+            "TODO: remove ignore_mismatched_sizes=True once the checkpoint is pinned",
+            UserWarning,
+        )
+
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_path,
+            self.model_path,
             torch_dtype=torch_dtype,
             device_map=device_map,
+            trust_remote_code=True,
+            ignore_mismatched_sizes=True,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_path,
+            trust_remote_code=True,
+        )
 
         if torch.cuda.is_available():
             self.device = 'cuda'
