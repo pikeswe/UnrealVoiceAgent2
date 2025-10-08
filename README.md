@@ -101,6 +101,7 @@ python scripts/tts_smoketest.py --text "Hello world, this is Nova speaking." --o
      ```
      The files land in `models/kani_tts`. Update `config/default_config.json` → `tts.model_dir` if you choose a different path.
      Ensure `nemo_toolkit[tts]` is installed to run the high-fidelity decoder.
+     If the Hugging Face download fails or stalls, the script automatically clones the official Kani-TTS repository into `external/kani-tts`, copies its `models/kani_tts` folder into your local `models` directory, and the runtime falls back to using that checkout.
 
 
 ## Unreal Engine Setup
