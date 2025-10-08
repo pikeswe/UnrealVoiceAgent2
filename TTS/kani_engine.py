@@ -8,6 +8,7 @@ from typing import AsyncIterator, Optional
 import numpy as np
 
 from TTS.kani_tts import KaniSynthesizer
+from TTS.kani_tts.model_utils import resolve_model_directory
 
 
 logger = logging.getLogger(__name__)
@@ -40,9 +41,10 @@ class KaniTTSEngine:
 
     async def load(self) -> None:
 
-        logger.info("Loading Kani-TTS models from %s", self.config.model_dir)
+        resolved_model_dir = resolve_model_directory(self.config.model_dir, log=logger)
+        logger.info("Loading Kani-TTS models from %s", resolved_model_dir)
         self._synth = KaniSynthesizer(
-            model_path=str(self.config.model_dir),
+            model_path=str(resolved_model_dir),
             voice=self.config.voice,
             sample_rate=self.config.sample_rate,
             chunk_size=self.config.chunk_size,

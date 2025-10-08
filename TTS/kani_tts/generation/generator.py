@@ -1,5 +1,6 @@
 """Text-to-speech generation logic"""
 
+import logging
 import time
 import warnings
 from threading import Thread
@@ -20,6 +21,10 @@ from ..config import (
     REPETITION_PENALTY,
     MAX_TOKENS,
 )
+from ..model_utils import resolve_model_reference
+
+
+logger = logging.getLogger(__name__)
 
 
 class TokenIDStreamer(BaseStreamer):
@@ -51,6 +56,7 @@ class TTSGenerator:
         device_map: str = "auto",
     ) -> None:
         self.model_path = model_name or MODEL_NAME
+        self.model_path = resolve_model_reference(self.model_path, log=logger)
 
         warnings.warn(
             "TODO: remove ignore_mismatched_sizes=True once the checkpoint is pinned",
